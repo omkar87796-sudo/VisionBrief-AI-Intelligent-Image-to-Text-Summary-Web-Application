@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Summary Generator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: #0a0a0f;
+            --surface: #13131a;
+            --border: #1e1e2e;
+            --accent: #7c6af7;
+            --accent2: #f77c8a;
+            --text: #e8e8f0;
+            --muted: #6b6b80;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+        }
+
+        /* Background grid */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: linear-gradient(var(--border) 1px, transparent 1px),
+                              linear-gradient(90deg, var(--border) 1px, transparent 1px);
+            background-size: 40px 40px;
+            opacity: 0.4;
+            pointer-events: none;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 48px;
+            position: relative;
+        }
+
+        header h1 {
+            font-family: 'Syne', sans-serif;
+            font-size: clamp(2rem, 5vw, 3.5rem);
+            font-weight: 800;
+            background: linear-gradient(135deg, #7c6af7, #f77c8a);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1.1;
+        }
+
+        header p {
+            color: var(--muted);
+            margin-top: 12px;
+            font-size: 1rem;
+            font-weight: 300;
+            letter-spacing: 0.05em;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 860px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            position: relative;
+        }
+
+        @media (max-width: 640px) {
+            .container { grid-template-columns: 1fr; }
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 28px;
+        }
+
+        .card h2 {
+            font-family: 'Syne', sans-serif;
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 20px;
+        }
+
+        /* Drop Zone */
+        .drop-zone {
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .drop-zone:hover, .drop-zone.drag-over {
+            border-color: var(--accent);
+            background: rgba(124, 106, 247, 0.05);
+        }
+
+        .drop-zone .icon {
+            font-size: 2.5rem;
+            opacity: 0.5;
+        }
+
+        .drop-zone p {
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        .drop-zone #preview {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 8px;
+            display: none;
+            object-fit: contain;
+        }
+
+        input[type="file"] { display: none; }
+
+        /* URL Input */
+        .url-input-wrap {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .url-input-wrap input {
+            flex: 1;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 14px;
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.875rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .url-input-wrap input:focus { border-color: var(--accent); }
+
+        /* Buttons */
+        button {
+            background: linear-gradient(135deg, var(--accent), #9a6af7);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 18px;
+            font-family: 'Syne', sans-serif;
+            font-size: 0.875rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            transition: opacity 0.2s, transform 0.1s;
+        }
+
+        button:hover { opacity: 0.9; transform: translateY(-1px); }
+        button:active { transform: translateY(0); }
+        button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+        .generate-btn {
+            width: 100%;
+            padding: 14px;
+            font-size: 1rem;
+            margin-top: 20px;
+            border-radius: 10px;
+        }
+
+        /* Summary output */
+        .summary-box {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px;
+            min-height: 160px;
+            font-size: 1rem;
+            line-height: 1.7;
+            color: var(--text);
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .summary-box.loading::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 10px;
+            background: linear-gradient(90deg, transparent, rgba(124,106,247,0.1), transparent);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+
+        .placeholder-text { color: var(--muted); font-size: 0.9rem; }
+
+        .copy-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--muted);
+            font-size: 0.8rem;
+            padding: 6px 12px;
+            margin-top: 12px;
+        }
+
+        .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+        .tag {
+            display: inline-block;
+            background: rgba(124,106,247,0.15);
+            color: var(--accent);
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 0.75rem;
+            font-family: 'Syne', sans-serif;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            margin-bottom: 14px;
+        }
+
+        .error { color: #f77c8a; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Image Summary Generator</h1>
+        <p>Upload any image — our deep learning model will describe it for you</p>
+    </header>
+
+    <div class="container">
+        <!-- LEFT: Input -->
+        <div class="card">
+            <h2>Input</h2>
+            <span class="tag">BLIP Model</span>
+
+            <label for="fileInput">
+                <div class="drop-zone" id="dropZone">
+                    <div class="icon">🖼️</div>
+                    <p>Drop an image here or <strong style="color:var(--accent)">click to upload</strong></p>
+                    <p style="font-size:0.8rem">PNG, JPG, WEBP supported</p>
+                    <img id="preview" alt="Preview" />
+                </div>
+            </label>
+            <input type="file" id="fileInput" accept="image/*">
+
+            <div class="url-input-wrap">
+                <input type="text" id="urlInput" placeholder="Or paste an image URL...">
+                <button onclick="loadFromUrl()">Load</button>
+            </div>
+
+            <button class="generate-btn" id="generateBtn" onclick="generateSummary()">
+                ✨ Generate Summary
+            </button>
+        </div>
+
+        <!-- RIGHT: Output -->
+        <div class="card">
+            <h2>Summary Output</h2>
+            <span class="tag">AI Generated</span>
+
+            <div class="summary-box" id="summaryBox">
+                <span class="placeholder-text">Your image summary will appear here...</span>
+            </div>
+
+            <button class="copy-btn" id="copyBtn" onclick="copySummary()" style="display:none">
+                📋 Copy Summary
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+
+        // Drag & drop
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+
+        dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+        dropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) handleFile(file);
+        });
+
+        fileInput.addEventListener('change', e => {
+            if (e.target.files[0]) handleFile(e.target.files[0]);
+        });
+
+        function handleFile(file) {
+            selectedFile = file;
+            const reader = new FileReader();
+            reader.onload = e => {
+                const preview = document.getElementById('preview');
+                preview.src = e.target.result;
+                preview.style.display = 'block';
+                dropZone.querySelector('.icon').style.display = 'none';
+                dropZone.querySelectorAll('p').forEach(p => p.style.display = 'none');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function loadFromUrl() {
+            const url = document.getElementById('urlInput').value.trim();
+            if (!url) return;
+            const preview = document.getElementById('preview');
+            preview.src = url;
+            preview.style.display = 'block';
+            dropZone.querySelector('.icon').style.display = 'none';
+            dropZone.querySelectorAll('p').forEach(p => p.style.display = 'none');
+            selectedFile = null;
+        }
+
+        async function generateSummary() {
+            const btn = document.getElementById('generateBtn');
+            const box = document.getElementById('summaryBox');
+            const url = document.getElementById('urlInput').value.trim();
+
+            if (!selectedFile && !url) {
+                box.innerHTML = '<span class="error">⚠️ Please upload an image or enter a URL first.</span>';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = '⏳ Generating...';
+            box.classList.add('loading');
+            box.innerHTML = '<span class="placeholder-text">Analyzing image with BLIP model...</span>';
+
+            try {
+                let response;
+
+                if (selectedFile) {
+                    const formData = new FormData();
+                    formData.append('image', selectedFile);
+                    response = await fetch('/summarize', { method: 'POST', body: formData });
+                } else {
+                    response = await fetch('/summarize', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ image_url: url })
+                    });
+                }
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    box.innerHTML = `<p>${data.summary}</p>`;
+                    document.getElementById('copyBtn').style.display = 'inline-block';
+                } else {
+                    box.innerHTML = `<span class="error">❌ Error: ${data.error}</span>`;
+                }
+            } catch (err) {
+                box.innerHTML = `<span class="error">❌ Network error: ${err.message}</span>`;
+            } finally {
+                box.classList.remove('loading');
+                btn.disabled = false;
+                btn.textContent = '✨ Generate Summary';
+            }
+        }
+
+        function copySummary() {
+            const text = document.getElementById('summaryBox').innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.getElementById('copyBtn');
+                btn.textContent = '✅ Copied!';
+                setTimeout(() => btn.textContent = '📋 Copy Summary', 2000);
+            });
+        }
+    </script>
+</body>
+</html>
