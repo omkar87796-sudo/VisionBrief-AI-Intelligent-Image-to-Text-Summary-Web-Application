@@ -4,3 +4,4 @@ transformers
 Pillow
 flask
 requests
+streamlit
